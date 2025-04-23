@@ -1,6 +1,7 @@
 import { Fragment, useState } from "react";
 import type { Place } from "../api/Place";
 import { Search } from "../api/Search";
+import Map from "./Map";
 
 interface LocationSearchProps {
   onPlaceClick: (place: Place) => void;
@@ -9,60 +10,133 @@ interface LocationSearchProps {
 function LocationSearch({ onPlaceClick }: LocationSearchProps) {
   const [places, setPlaces] = useState<Place[]>([]);
   const [term, setTerm] = useState("");
+  const [history, setHistory] = useState<Place[]>([]);
+  const [favorites, setFavorites] = useState<Place[]>([]);
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+  const [placeDetails, setPlaceDetails] = useState<{
+    overview: string;
+    reviews: string[];
+    about: string;
+  } | null>(null);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const results = await Search(term);
-    console.log(results, "location search");
-    if (results) {
-      setPlaces(results);
+    try {
+      const results = await Search(term);
+      if (results) {
+        setPlaces(results);
+      }
+    } catch (error) {
+      console.error("Error during search:", error);
+      alert("An error occurred while searching. Please try again.");
     }
   };
-  return (
-    <div>
-      {/* <form onSubmit={handleSubmit}>
-        <label className='font-bold' htmlFor='term'>
-         {" "}
-        </label>
-        <input
-          className='border border-gray-300 rounded-md shadow-sm focus:border-indigo-500 px-4 py-2 w-full'
-          id='term'
-          value={term}
-          onChange={(e) => setTerm(e.target.value)}
-        />
-          </form> */}
-          
-<form className="max-w-md mx-auto" onSubmit={handleSubmit}>   
-    <label htmlFor="term" className="mb-2 text-sm font-medium text-gray-900 sr-only light:text-white">Search</label>
-    <div className="relative">
-        <div className="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
-            <svg className="w-4 h-4 text-gray-500 light:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
-                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
-            </svg>
-        </div>
-        <input id='term'
-          value={term}
-          onChange={(e) => setTerm(e.target.value)} className="block w-full p-4 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 light:bg-gray-700 light:border-gray-600 light:placeholder-gray-400 light:text-white light:focus:ring-blue-500 light:focus:border-blue-500" placeholder="Search..." required />
-        {/* <button type="submit" className="text-white absolute end-2.5 bottom-2.5 bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 light:bg-blue-600 light:hover:bg-blue-700 light:focus:ring-blue-800">Search</button> */}
-    </div>
-</form>
 
-      <h1 className='font-bold mt-6'>Found Locations</h1>
-      <div className='grid grid-cols-[1fr,40px] gap-2 mt-2 items-center'>
-        {places.map((place) => {
-          return (
-            <Fragment key={place.id}>
-              <p className='text-sm'>{place.name}</p>
-              <button
-                className='bg-blue-500 text-sm text-whilte font-bold py-1 px-1 rounded'
-                onClick={() => onPlaceClick(place)}>
-                Go
-                  </button>
-                  <div className="border-b w-full col-span-2" />
-            </Fragment>
-          );
-        })}
-      </div>
+  const addToHistory = (place: Place) => {
+    setHistory((prev) => [place, ...prev.filter((p) => p.id !== place.id)]);
+  };
+
+  const addToFavorites = (place: Place) => {
+    setFavorites((prev) => [...prev, place]);
+  };
+
+  const handlePlaceClick = (place: Place) => {
+    setSelectedPlace(place);
+    setPlaceDetails({
+      overview: "This is a sample overview of the place.",
+      reviews: ["Great place!", "Loved it!", "Would visit again."],
+      about: "This place is known for its scenic beauty and vibrant culture.",
+    });
+    onPlaceClick(place);
+    addToHistory(place);
+  };
+
+  return (
+    <div className="p-4 bg-gray-100 min-h-screen">
+      <form className="max-w-md mx-auto bg-white shadow-md rounded-lg p-4" onSubmit={handleSubmit}>
+        <label htmlFor="term" className="mb-2 text-sm font-medium text-gray-900 sr-only">Search</label>
+        <div className="relative">
+          <input
+            id="term"
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+            className="block w-full p-4 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50"
+            placeholder="Search..."
+            required
+          />
+        </div>
+      </form>
+
+      {places.length > 0 && (
+        <>
+          <h1 className="font-bold mt-6 text-lg">Found Locations</h1>
+          <div className="grid grid-cols-[1fr,40px,40px] gap-2 mt-2 items-center bg-white shadow-md rounded-lg p-4">
+            {places.map((place) => (
+              <Fragment key={place.id}>
+                <p className="text-sm">{place.name}</p>
+                <button
+                  className="bg-blue-500 text-sm text-white font-bold py-1 px-1 rounded"
+                  onClick={() => handlePlaceClick(place)}
+                >
+                  Go
+                </button>
+                <button
+                  className="bg-green-500 text-sm text-white font-bold py-1 px-1 rounded"
+                  onClick={() => addToFavorites(place)}
+                >
+                  Fav
+                </button>
+                <div className="border-b w-full col-span-3" />
+              </Fragment>
+            ))}
+          </div>
+        </>
+      )}
+
+      <Map selectedPlace={selectedPlace} />
+
+      {selectedPlace && placeDetails && (
+        <>
+          <h1 className="font-bold mt-6 text-lg">Place Details</h1>
+          <div className="bg-white shadow-md rounded-lg p-4">
+            <h2 className="text-lg font-bold">{selectedPlace.name}</h2>
+            <p className="text-sm mt-2"><strong>Overview:</strong> {placeDetails.overview}</p>
+            <p className="text-sm mt-2"><strong>About:</strong> {placeDetails.about}</p>
+            <h3 className="text-sm font-bold mt-4">Reviews:</h3>
+            <ul className="list-disc list-inside">
+              {placeDetails.reviews.map((review, index) => (
+                <li key={index} className="text-sm">{review}</li>
+              ))}
+            </ul>
+          </div>
+        </>
+      )}
+
+      {history.length > 0 && (
+        <>
+          <h1 className="font-bold mt-6 text-lg">Recents</h1>
+          <ul className="bg-white shadow-md rounded-lg p-4">
+            {history.map((place, index) => (
+              <li key={index} className="text-sm border-b py-1">
+                {place.name}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {favorites.length > 0 && (
+        <>
+          <h1 className="font-bold mt-6 text-lg">Favorites</h1>
+          <ul className="bg-white shadow-md rounded-lg p-4">
+            {favorites.map((place, index) => (
+              <li key={index} className="text-sm border-b py-1">
+                {place.name}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }
