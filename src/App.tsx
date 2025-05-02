@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import LocationSearch from "./components/LocationSearch";
-
+import './App.css'
 
 function App() {
   

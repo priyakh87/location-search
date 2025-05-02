@@ -1,11 +1,9 @@
 import axios from "axios";
 
 export async function fetchWikiSummary(placeName: string): Promise<{ summary: string; url: string; thumbnail: string | null }> {
-  console.log(placeName,"nanananwifi");
   
   const apiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(placeName)}`;
     try {
-      console.log(apiUrl,"nananawifi");
       
     const response = await axios.get(apiUrl);
     const { extract, content_urls, thumbnail } = response.data;

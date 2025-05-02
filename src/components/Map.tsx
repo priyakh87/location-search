@@ -2,6 +2,7 @@ import React from "react";
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import L from "leaflet";
 import { fetchWikiSummary } from "../api/wiki";
 
 interface WikiData {
@@ -10,13 +11,27 @@ interface WikiData {
   thumbnail?: string;
   longitude: number;
   latitude: number;
+  zoomLevel?: number; // Add zoomLevel property
 }
 
 interface MapProps {
   selectedPlace: WikiData | null;
+  setSelectedPlace: (place: WikiData) => void;
 }
 
+const customIcon = L.icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
 const Map: React.FC<MapProps> = ({ selectedPlace }) => {
+  const defaultCityZoom = 6; // Default zoom for cities
+  const defaultPlaceZoom = 12; // Default zoom for specific places
+
   const mapCenter: [number, number] = selectedPlace
     ? [selectedPlace.longitude, selectedPlace.latitude]
     : [37.7749, -122.4194]; // Default coordinates
@@ -25,11 +40,8 @@ const Map: React.FC<MapProps> = ({ selectedPlace }) => {
 
   useEffect(() => {
     if (selectedPlace) {
-      console.log("Selected place details:", selectedPlace); // Debug log to inspect selectedPlace
-      console.log("Longitude:", selectedPlace.longitude, "Latitude:", selectedPlace.latitude); // Log coordinates
       fetchWikiSummary(selectedPlace.title)
         .then((data) => {
-          console.log("Fetched Wikipedia data:", data); // Debug log
           const image = data.thumbnail ? data.thumbnail : ''; // Safely access thumbnail
           setWikiData({ summary: data.summary, url: data.url, image });
         })
@@ -37,16 +49,18 @@ const Map: React.FC<MapProps> = ({ selectedPlace }) => {
           console.error("Error fetching Wikipedia data:", error); // Improved error logging
         });
     } else {
-      setWikiData(null);    }
-  }, [selectedPlace]); 
+      setWikiData(null);
+    }
+  }, [selectedPlace]);
+
   const MapUpdater = () => {
-    const map = useMap(); 
+    const map = useMap();
     useEffect(() => {
       if (selectedPlace) {
-        console.log("Updating map view to:", selectedPlace.latitude, selectedPlace.longitude); // Debug log for map update
-        map.setView([selectedPlace.latitude, selectedPlace.longitude], 10); // Update map view
+        const zoom = selectedPlace.zoomLevel || (selectedPlace.description.includes("city") ? defaultCityZoom : defaultPlaceZoom);
+        map.setView([selectedPlace.latitude, selectedPlace.longitude], zoom); // Dynamically set zoom level
       }
-    }, [map]); // Added selectedPlace to dependency array
+    }, [map, selectedPlace]);
     return null;
   };
 
@@ -56,31 +70,18 @@ const Map: React.FC<MapProps> = ({ selectedPlace }) => {
 
   return (
     <div className="mt-6 h-screen w-screen overflow-hidden">
-
-      {/* <h2 className="text-lg font-bold">Map View</h2> */}
-      {/* <div className="mt-4">
-        <p>
-          <strong>Title:</strong> {selectedPlace.title}
-        </p>
-        <p>
-          <strong>Description:</strong> {selectedPlace.description}
-        </p>
-        <p>
-          <strong>Coordinates:</strong> {selectedPlace.latitude}, {selectedPlace.longitude}
-        </p>
-      </div> */}
       <MapContainer
         center={mapCenter}
-        zoom={8}
+        zoom={selectedPlace?.zoomLevel || defaultCityZoom} // Initial zoom level
         style={{ height: "100%", width: "100%" }}
       >
-        <MapUpdater /> {/* Component to handle map updates */}
+        <MapUpdater />
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
         {selectedPlace && (
-          <Marker position={[selectedPlace.latitude, selectedPlace.longitude]}>
+          <Marker position={[selectedPlace.latitude, selectedPlace.longitude]} icon={customIcon}>
             <Popup>
               <strong>{selectedPlace.title}</strong>
               {wikiData ? (
@@ -92,7 +93,7 @@ const Map: React.FC<MapProps> = ({ selectedPlace }) => {
                   </a>
                 </>
               ) : (
-                <p>{selectedPlace ? "Loading Wikipedia data..." : "No place selected"}</p> // Improved message
+                <p>{selectedPlace ? "Loading Wikipedia data..." : "No place selected"}</p>
               )}
             </Popup>
           </Marker>

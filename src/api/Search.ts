@@ -22,11 +22,15 @@ export const Search = async (term: string) => {
        
             return {
                 id: feature.properties.place_id,
-                name: feature.properties.display_name,
+                title: feature.properties.display_name,
                 longitude:feature.geometry.coordinates[0],
                 latitude: feature.geometry.coordinates[1],
-                locationHistory: [],
-                favoriteLocations: []
+                description: feature.properties.display_name,
+                zoomLevel: 12,
+                thumbnail: "",
+                wikiUrl: "",
+                summary: "",
+                wikiImage: "",
 
             }
         })
