@@ -1,9 +1,10 @@
 import React from "react";
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap,GeoJSON } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { fetchWikiSummary } from "../api/wiki";
+import { fetchNominatimData } from "../utils/nominatim";
 
 interface WikiData {
   title: string;
@@ -29,38 +30,77 @@ const customIcon = L.icon({
 });
 
 const Map: React.FC<MapProps> = ({ selectedPlace }) => {
-  const defaultCityZoom = 6; // Default zoom for cities
+  const defaultCityZoom = 10; // Default zoom for cities
   const defaultPlaceZoom = 12; // Default zoom for specific places
 
   const mapCenter: [number, number] = selectedPlace
-    ? [selectedPlace.longitude, selectedPlace.latitude]
+    ? [selectedPlace.latitude, selectedPlace.longitude] // Corrected order
     : [37.7749, -122.4194]; // Default coordinates
 
   const [wikiData, setWikiData] = useState<{ summary: string; url: string; image: string | null } | null>(null);
+  const [boundaryGeoJson, setBoundaryGeoJson] = useState<GeoJSON.Feature | null>(null);
+  const [isLoading, setIsLoading] = useState(false); // State to track loading status
+
+  const keyWordList = ['city','capital','town','small town','big town','village','region','province','state','district','municipality','borough','county','emirate','country','territory','island'];
+  const isSearchedLocation= keyWordList.some((place)=>selectedPlace?.description.toLowerCase().includes(place));
 
   useEffect(() => {
-    if (selectedPlace) {
-      fetchWikiSummary(selectedPlace.title)
-        .then((data) => {
-          const image = data.thumbnail ? data.thumbnail : ''; // Safely access thumbnail
-          setWikiData({ summary: data.summary, url: data.url, image });
-        })
-        .catch((error) => {
-          console.error("Error fetching Wikipedia data:", error); // Improved error logging
-        });
-    } else {
+    if (!selectedPlace) {
       setWikiData(null);
+      setBoundaryGeoJson(null);
+      setIsLoading(false); // Stop loading if no place is selected
+      return;
     }
-  }, [selectedPlace]);
+
+    setIsLoading(true); // Start loading when fetching data
+
+    // Wiki summary fetch
+    fetchWikiSummary(selectedPlace.title)
+      .then((data) => {
+        const image = data.thumbnail ? data.thumbnail : '';
+        setWikiData({ summary: data.summary, url: data.url, image });
+      })
+      .catch((error) => {
+        console.error("Error fetching Wikipedia data:", error);
+      });
+
+    // City boundary fetch
+    if(isSearchedLocation) {
+      fetchNominatimData(selectedPlace.title)
+        .then((boundary) => {
+          if (boundary && boundary.type === "Feature") {
+            setBoundaryGeoJson(boundary as GeoJSON.Feature); // Explicitly cast to GeoJSON.Feature
+          } else {
+            console.error("Invalid boundary data:", boundary);
+            setBoundaryGeoJson(null);
+          }
+        })
+        .catch((err) => {
+          console.error("Error fetching boundary:", err);
+          setBoundaryGeoJson(null);
+        })
+        .finally(() => setIsLoading(false)); // Stop loading after boundary fetch
+    } else {
+      setBoundaryGeoJson(null);
+      setIsLoading(false); // Stop loading if no boundary data is fetched
+    }
+  }, [selectedPlace,isSearchedLocation]);
 
   const MapUpdater = () => {
     const map = useMap();
     useEffect(() => {
-      if (selectedPlace) {
+      if (!selectedPlace) return;
+
+      if (boundaryGeoJson) {
+        const layer = L.geoJSON(boundaryGeoJson);
+        map.fitBounds(layer.getBounds());
+      } else {
         const zoom = selectedPlace.zoomLevel || (selectedPlace.description.includes("city") ? defaultCityZoom : defaultPlaceZoom);
-        map.setView([selectedPlace.latitude, selectedPlace.longitude], zoom); // Dynamically set zoom level
+        map.setView([selectedPlace.latitude, selectedPlace.longitude], zoom);
       }
-    }, [map, selectedPlace]);
+      console.log("Map updated to fit bounds of selected place:", selectedPlace.description);
+    }, [map, selectedPlace, boundaryGeoJson]);
+
     return null;
   };
 
@@ -70,6 +110,11 @@ const Map: React.FC<MapProps> = ({ selectedPlace }) => {
 
   return (
     <div className="mt-6 h-screen w-screen overflow-hidden">
+      {isLoading && (
+        <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-white bg-opacity-75 z-50">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      )}
       <MapContainer
         center={mapCenter}
         zoom={selectedPlace?.zoomLevel || defaultCityZoom} // Initial zoom level
@@ -97,6 +142,17 @@ const Map: React.FC<MapProps> = ({ selectedPlace }) => {
               )}
             </Popup>
           </Marker>
+        )}
+        {boundaryGeoJson?.geometry && (
+          <GeoJSON
+            data={boundaryGeoJson}
+            style={{
+              color: "blue",
+              weight: 2,
+              fillColor: "blue",
+              fillOpacity: 0.1,
+            }}
+          />
         )}
       </MapContainer>
     </div>

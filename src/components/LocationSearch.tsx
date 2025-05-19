@@ -91,11 +91,15 @@ function LocationSearch() {
         latitude: page.coordinates?.[0]?.lat || 0,
         longitude: page.coordinates?.[0]?.lon || 0, // Fix: Use the first element of the array
       }));
-      console.log("Formatted results:", formattedResults); // Debug log
+      console.log("Formatted results:", formattedResults[0]); // Debug log
       const res = formattedResults.filter(
-        (place) => place.latitude !== 0 && place.longitude !== 0,
+        (place) => place.latitude !== 0 && place.longitude !== 0
       );
-      setResults(res);
+      console.log("Filtered results:", res[0]); // Debug log
+
+      setSelectedPlace(null); // Clear selected place on new search
+      setResults(res.length > 0 ? [res[0]] : [defaultLocation]); // Ensure the first value is added or default location is used
+      setTerm(""); // Clear the input field after submission
       console.log(res);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -111,9 +115,14 @@ function LocationSearch() {
       return;
     }
     setSelectedPlace(place);
-    setResults([]); // Clear results after selection
-    console.log("Selected place:", place); // Debug log
+    setResults([place]); // Clear results after selection
+    console.log("Selected place:", place, results.length, "Before state update"); // Debug log
   };
+
+  // Add a useEffect to monitor changes in `results`
+  useEffect(() => {
+    console.log("Results updated:", results.length, results); // Debug log
+  }, [results]);
 
   return (
     <div className='grid grid-cols-12'>
