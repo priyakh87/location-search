@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap, GeoJSON } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { fetchWikiSummary } from "../api/wiki";
 import { fetchNominatimData } from "../utils/nominatim";
 import MarkerClusterGroup from "react-leaflet-cluster";
 
@@ -39,7 +38,6 @@ const Map: React.FC<MapProps> = ({ selectedPlace, setSelectedPlace, places = [] 
     ? [selectedPlace.latitude, selectedPlace.longitude] // Corrected order
     : [37.7749, -122.4194]; // Default coordinates
 
-  const [wikiData, setWikiData] = useState<{ summary: string; url: string; image: string | null } | null>(null);
   const [boundaryGeoJson, setBoundaryGeoJson] = useState<GeoJSON.Feature | null>(null);
   const [isLoading, setIsLoading] = useState(false); // State to track loading status
   const [nearbyHospitals, setNearbyHospitals] = useState<WikiData[]>([]);
@@ -50,23 +48,12 @@ const Map: React.FC<MapProps> = ({ selectedPlace, setSelectedPlace, places = [] 
 
   useEffect(() => {
     if (!selectedPlace) {
-      setWikiData(null);
       setBoundaryGeoJson(null);
       setIsLoading(false); // Stop loading if no place is selected
       return;
     }
 
     setIsLoading(true); // Start loading when fetching data
-
-    // Wiki summary fetch
-    fetchWikiSummary(selectedPlace.title)
-      .then((data) => {
-        const image = data.thumbnail ? data.thumbnail : '';
-        setWikiData({ summary: data.summary, url: data.url, image });
-      })
-      .catch((error) => {
-        console.error("Error fetching Wikipedia data:", error);
-      });
 
     // City boundary fetch
     if(isSearchedLocation) {
@@ -102,8 +89,12 @@ const Map: React.FC<MapProps> = ({ selectedPlace, setSelectedPlace, places = [] 
         const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
         const data = await res.json();
         setNearbyHospitals(
-          data.map((item: any) => ({
-            title: item.display_name.split(",")[0] || "Hospital",
+          data.map((item: {
+            display_name: string;
+            lon: string;
+            lat: string;
+          }) => ({
+            title: item.display_name?.split(",")[0] || "Hospital",
             description: "Hospital",
             longitude: parseFloat(item.lon),
             latitude: parseFloat(item.lat),
@@ -128,7 +119,11 @@ const Map: React.FC<MapProps> = ({ selectedPlace, setSelectedPlace, places = [] 
         const res = await fetch(url);
         const data = await res.json();
         setFamousLocations(
-          (data.query?.geosearch || []).map((item: any) => ({
+          (data.query?.geosearch || []).map((item: {
+            title: string;
+            lon: number;
+            lat: number;
+          }) => ({
             title: item.title,
             description: "Famous Location",
             longitude: item.lon,
