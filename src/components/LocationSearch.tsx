@@ -190,10 +190,17 @@ function LocationSearch() {
         )}
       </div>
       <div className='col-span-12 md:col-span-9'>
-        {selectedPlace && (
+        {selectedPlace && !searchResults && (
           <Map
             selectedPlace={selectedPlace}
             setSelectedPlace={setSelectedPlace}
+          />
+        )}
+        {searchResults && results.length > 0 && (
+          <Map
+            selectedPlace={results[0]}
+            setSelectedPlace={setSelectedPlace}
+            places={results}
           />
         )}
       </div>
