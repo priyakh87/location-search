@@ -1,3 +1,47 @@
+# Location Search
+
+A React + Vite app to search locations and view them on a map.
+
+## Development
+
+```bash
+npm install
+npm run dev
+```
+
+## Build
+
+```bash
+npm run build
+```
+
+## Deploy to GitHub Pages
+
+1. Make sure your `vite.config.ts` contains:
+    ```ts
+    export default defineConfig({
+      // ...
+      base: '/location-search/',
+    });
+    ```
+2. Add the correct `homepage` in `package.json`:
+    ```json
+    "homepage": "https://priyakh87.github.io/location-search"
+    ```
+3. Deploy:
+    ```bash
+    npm run deploy
+    ```
+
+Your app will be available at:  
+https://priyakh87.github.io/location-search/
+
+## Troubleshooting
+
+- If the site shows a blank page, check the browser console for 404 errors.  
+- Ensure the `base` in `vite.config.ts` matches your repo name.
+- Push all changes to GitHub before running `npm run deploy`.
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
