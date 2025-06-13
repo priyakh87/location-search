@@ -3,6 +3,7 @@ import Map from "./Map";
 import WikiData from "../types/WikiData";
 import WikiPage from "../types/WikiPage";
 import WeatherCard from "./WeatherCard";
+import LocationOverview from "./LocationOverview";
 
 
 
@@ -11,7 +12,7 @@ function LocationSearch() {
   const [results, setResults] = useState<WikiData[]>([]);
   const [selectedPlace, setSelectedPlace] = useState<WikiData | null>(null);
   const apiKey = import.meta.env.VITE_OPENCAGE_API_KEY;
-
+  const [searchResults, setSearchResults] = useState<boolean>(true); // Fix destructuring
   // Default location (UAE)
   const defaultLocation = useMemo(
     () => ({
@@ -98,8 +99,9 @@ function LocationSearch() {
       console.log("Filtered results:", res[0]); // Debug log
 
       setSelectedPlace(null); // Clear selected place on new search
-      setResults(res.length > 0 ? [res[0]] : [defaultLocation]); // Ensure the first value is added or default location is used
-      setTerm(""); // Clear the input field after submission
+      setResults(res.length > 0 ? [res[0]] : [defaultLocation]);
+      setTerm("");
+      setSearchResults(true); // Show results after a new search
       console.log(res);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -108,14 +110,14 @@ function LocationSearch() {
   };
 
   const handlePlaceClick = (place: WikiData) => {
-    console.log("Place clicked:", place); // Debug log
-
+    
     if (!place.title) {
       alert("Cannot fetch details for the user's current location.");
       return;
     }
     setSelectedPlace(place);
-    setResults([place]); // Clear results after selection
+    setResults([place]);
+    setSearchResults(false); // Hide results after selection
     console.log("Selected place:", place, results.length, "Before state update"); // Debug log
   };
 
@@ -148,7 +150,7 @@ function LocationSearch() {
             </div>
           </form>
 
-          {results.length > 0 && (
+          {searchResults && results.length > 0 && (
             <>
               <h1 className='font-bold mt-6 text-lg'>Search Results</h1>
               <div className='grid gap-4 mt-4'>
@@ -180,8 +182,12 @@ function LocationSearch() {
             </>
           )}
         </div>
-        {selectedPlace && <WeatherCard place={selectedPlace} />}
-
+        {selectedPlace && (
+          <>
+            <WeatherCard place={selectedPlace} />
+            <LocationOverview place={selectedPlace} />
+          </>
+        )}
       </div>
       <div className='col-span-12 md:col-span-9'>
         {selectedPlace && (
