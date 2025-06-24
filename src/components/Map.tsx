@@ -1,10 +1,22 @@
 import React from "react";
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap, GeoJSON } from "react-leaflet";
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap, GeoJSON } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { fetchNominatimData } from "../utils/nominatim";
 import MarkerClusterGroup from "react-leaflet-cluster";
+
+interface MapProps {
+  selectedPlace: WikiData | null;
+  setSelectedPlace: (place: WikiData) => void;
+  places?: WikiData[];
+  routeLine?: number[][];
+  directionsMode?: boolean; // <-- Add this prop
+  originName?: string; // <-- Add originName prop
+  destinationName?: string; // <-- Add destinationName prop
+  originCoords?: [number, number]; // <-- Add originCoords prop
+  destinationCoords?: [number, number]; // <-- Add destinationCoords prop
+}
 
 interface WikiData {
   title: string;
@@ -12,13 +24,7 @@ interface WikiData {
   thumbnail?: string;
   longitude: number;
   latitude: number;
-  zoomLevel?: number; // Add zoomLevel property
-}
-
-interface MapProps {
-  selectedPlace: WikiData | null;
-  setSelectedPlace: (place: WikiData) => void;
-  places?: WikiData[]; // Add this prop for multiple places
+  zoomLevel?: number;
 }
 
 const customIcon = L.icon({
@@ -30,7 +36,17 @@ const customIcon = L.icon({
   shadowSize: [41, 41],
 });
 
-const Map: React.FC<MapProps> = ({ selectedPlace, setSelectedPlace, places = [] }) => {
+const Map: React.FC<MapProps> = ({
+  selectedPlace,
+  setSelectedPlace,
+  places = [],
+  routeLine,
+  directionsMode = false, // <-- default to false
+  originName,
+  destinationName,
+  originCoords,
+  destinationCoords,
+}) => {
   const defaultCityZoom = 10; // Default zoom for cities
   const defaultPlaceZoom = 12; // Default zoom for specific places
 
@@ -137,20 +153,42 @@ const Map: React.FC<MapProps> = ({ selectedPlace, setSelectedPlace, places = [] 
     fetchFamous();
   }, [selectedPlace]);
 
+  // Add a state to control MapUpdater execution
+  const [shouldUpdateMap, setShouldUpdateMap] = useState(false);
+
+  // Listen for routeLine changes to trigger MapUpdater only in directions mode
+  useEffect(() => {
+    if (routeLine && routeLine.length > 1) {
+      setShouldUpdateMap(true);
+    } else {
+      setShouldUpdateMap(false);
+    }
+  }, [routeLine]);
+
   const MapUpdater = () => {
     const map = useMap();
     useEffect(() => {
+      // Only run when shouldUpdateMap is true (i.e., directions mode)
+      if (!shouldUpdateMap) return;
       if (!selectedPlace) return;
 
       if (boundaryGeoJson) {
         const layer = L.geoJSON(boundaryGeoJson);
         map.fitBounds(layer.getBounds());
+      } else if (routeLine && routeLine.length > 1) {
+        // Fit map to route polyline bounds
+        const latlngs = routeLine.map(([lng, lat]) => [lat, lng]);
+        const bounds = L.latLngBounds(latlngs);
+        map.fitBounds(bounds, { padding: [50, 50] });
       } else {
         const zoom = selectedPlace.zoomLevel || (selectedPlace.description.includes("city") ? defaultCityZoom : defaultPlaceZoom);
         map.setView([selectedPlace.latitude, selectedPlace.longitude], zoom);
       }
-      console.log("Map updated to fit bounds of selected place:", selectedPlace.description);
-    }, [map, selectedPlace, boundaryGeoJson]);
+      // Only log when updating due to directions
+      if (shouldUpdateMap) {
+        console.log("Map updated for directions/route.");
+      }
+    }, [map, boundaryGeoJson, routeLine, shouldUpdateMap]);
 
     return null;
   };
@@ -158,8 +196,28 @@ const Map: React.FC<MapProps> = ({ selectedPlace, setSelectedPlace, places = [] 
   // Use all places if provided, otherwise just the selectedPlace
   const markers = places.length > 0 ? places : selectedPlace ? [selectedPlace] : [];
 
-  if (!selectedPlace) {
+  // Only render map if:
+  // - directionsMode is true and routeLine is present (directions mode)
+  // - OR directionsMode is false and selectedPlace is present (normal mode)
+  if (
+    (directionsMode && !(routeLine && routeLine.length > 1)) ||
+    (!directionsMode && !selectedPlace)
+  ) {
     return <div className="mt-6 text-center">Select a place to view on the map.</div>;
+  }
+
+  // If directions mode, set mapCenter to the center of the routeLine
+  let mapCenterToUse: [number, number];
+  if (directionsMode && routeLine && routeLine.length > 1) {
+    const lats = routeLine.map(([lng, lat]) => lat);
+    const lngs = routeLine.map(([lng, lat]) => lng);
+    const avgLat = lats.reduce((a, b) => a + b, 0) / lats.length;
+    const avgLng = lngs.reduce((a, b) => a + b, 0) / lngs.length;
+    mapCenterToUse = [avgLat, avgLng];
+  } else {
+    mapCenterToUse = selectedPlace
+      ? [selectedPlace.latitude, selectedPlace.longitude]
+      : [37.7749, -122.4194];
   }
 
   return (
@@ -170,11 +228,12 @@ const Map: React.FC<MapProps> = ({ selectedPlace, setSelectedPlace, places = [] 
         </div>
       )}
       <MapContainer
-        center={mapCenter}
-        zoom={selectedPlace?.zoomLevel || defaultCityZoom}
+        center={mapCenterToUse}
+        zoom={selectedPlace?.zoomLevel || 10}
         style={{ height: "100%", width: "100%" }}
       >
-        <MapUpdater />
+        {/* Only render MapUpdater if shouldUpdateMap is true */}
+        {shouldUpdateMap && <MapUpdater />}
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -243,6 +302,31 @@ const Map: React.FC<MapProps> = ({ selectedPlace, setSelectedPlace, places = [] 
               fillOpacity: 0.1,
             }}
           />
+        )}
+        {/* Show route polyline if directionsMode is on and routeLine exists */}
+        {directionsMode && routeLine && routeLine.length > 1 && (
+          <>
+            <Polyline
+              positions={routeLine.map(([lng, lat]) => [lat, lng])}
+              pathOptions={{ color: "red", weight: 5 }}
+            />
+            {/* Origin Marker */}
+            {originCoords && (
+              <Marker position={[originCoords[1], originCoords[0]]}>
+                <Popup>
+                  <b>Start:</b> {originName}
+                </Popup>
+              </Marker>
+            )}
+            {/* Destination Marker */}
+            {destinationCoords && (
+              <Marker position={[destinationCoords[1], destinationCoords[0]]}>
+                <Popup>
+                  <b>End:</b> {destinationName}
+                </Popup>
+              </Marker>
+            )}
+          </>
         )}
       </MapContainer>
     </div>
