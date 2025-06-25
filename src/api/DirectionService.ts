@@ -49,9 +49,9 @@ export async function fetchDirections(
     
     // You may need to adapt this to your API's response structure
     return {
-      coordinates: data.routes[0].geometry.coordinates,
+      coordinates: data.routes[0].bbox[0],
       steps: data.routes[0].segments[0].steps,
-      summary: data.routes[0].summary[0],
+      summary: data.routes[0].summary,
     };
   } catch (err: any) {
     // Rethrow with a user-friendly message

@@ -349,6 +349,7 @@ function LocationSearch() {
           </div>
         )}
         <div>
+          
           {directionsMode && routeSteps.length > 0 && routeSummary && (
             <DirectionsPanel
               steps={routeSteps}
